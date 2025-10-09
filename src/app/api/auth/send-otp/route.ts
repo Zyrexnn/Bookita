@@ -64,11 +64,16 @@ async function sendOTPEmail(email: string, otp: string, username?: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Send OTP API called');
+    
     const body = await request.json();
     const { email, username } = body;
 
+    console.log('Request body:', { email, username: username || 'N/A' });
+
     // Validate input
     if (!email || !email.includes('@')) {
+      console.log('Invalid email:', email);
       return NextResponse.json(
         { error: 'Email tidak valid' },
         { status: 400 }
@@ -76,6 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (username && (typeof username !== 'string' || username.length < 3)) {
+      console.log('Invalid username:', username);
       return NextResponse.json(
         { error: 'Username minimal 3 karakter' },
         { status: 400 }
@@ -84,9 +90,11 @@ export async function POST(request: NextRequest) {
 
     // Get client IP for rate limiting
     const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+    console.log('Client IP:', clientIP);
     
     // Check rate limiting for IP
     if (!checkRateLimit(clientIP)) {
+      console.log('Rate limit exceeded for IP:', clientIP);
       return NextResponse.json(
         { error: 'Terlalu banyak permintaan. Silakan coba lagi dalam 1 menit.' },
         { status: 429 }
@@ -95,6 +103,7 @@ export async function POST(request: NextRequest) {
 
     // Check rate limiting for email
     if (!checkRateLimit(email)) {
+      console.log('Rate limit exceeded for email:', email);
       return NextResponse.json(
         { error: 'Terlalu banyak permintaan untuk email ini. Silakan coba lagi dalam 1 menit.' },
         { status: 429 }
@@ -106,6 +115,7 @@ export async function POST(request: NextRequest) {
     
     if (username) {
       // Registration mode - check if email or username already exists
+      console.log('Registration mode - checking existing user...');
       const existingUser = await db.user.findFirst({
         where: {
           OR: [
@@ -116,6 +126,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (existingUser) {
+        console.log('User already exists:', existingUser.email === email ? 'Email' : 'Username');
         return NextResponse.json(
           { error: existingUser.email === email ? 'Email sudah terdaftar' : 'Username sudah digunakan' },
           { status: 409 }
@@ -123,6 +134,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Create new user
+      console.log('Creating new user...');
       user = await db.user.create({
         data: {
           email,
@@ -130,25 +142,32 @@ export async function POST(request: NextRequest) {
           name: username // You can add a separate name field if needed
         }
       });
+      console.log('User created:', user.id);
     } else {
       // Login mode - check if user exists
+      console.log('Login mode - finding user...');
       user = await db.user.findUnique({
         where: { email }
       });
 
       if (!user) {
+        console.log('User not found:', email);
         return NextResponse.json(
           { error: 'Email tidak terdaftar' },
           { status: 404 }
         );
       }
+      console.log('User found:', user.id);
     }
 
     // Generate OTP
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
 
+    console.log('Generated OTP:', otp);
+
     // Delete any existing unused OTPs for this email
+    console.log('Deleting existing OTPs...');
     await db.otp.deleteMany({
       where: {
         email,
@@ -157,25 +176,33 @@ export async function POST(request: NextRequest) {
     });
 
     // Save OTP to database
+    console.log('Saving OTP to database...');
     await db.otp.create({
       data: {
         code: otp,
         email,
         expiresAt,
-        userId: user.id
+        user: {
+          connect: {
+            email
+          }
+        }
       }
     });
 
     // Send OTP email
+    console.log('Sending OTP email...');
     const emailSent = await sendOTPEmail(email, otp, username || user.username);
 
     if (!emailSent) {
+      console.log('Failed to send email');
       return NextResponse.json(
         { error: 'Gagal mengirim email OTP' },
         { status: 500 }
       );
     }
 
+    console.log('OTP sent successfully');
     return NextResponse.json({
       message: 'Kode OTP telah dikirim ke email Anda',
       email: email.substring(0, 3) + '***' + email.split('@')[1] // Partial email for security

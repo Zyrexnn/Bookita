@@ -6,10 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Navbar from "@/components/Navbar";
 import { 
   Menu, X, ArrowRight, Check, Star, Quote, Mail, BookOpen, Gift, CheckCircle,
   Download, Smartphone, Users, Heart, TrendingUp, Award
 } from "lucide-react";
+
+interface User {
+  id: string;
+  email: string;
+  username: string;
+  name?: string;
+}
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -18,6 +26,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("reader");
   const [scrollY, setScrollY] = useState(0);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -25,6 +34,24 @@ export default function Home() {
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const checkAuthStatus = async () => {
+      try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+        }
+      } catch (error) {
+        // User is not logged in
+        setUser(null);
+      }
+    };
+
+    checkAuthStatus();
   }, []);
 
   const toggleMenu = () => {
@@ -263,109 +290,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Navbar */}
-      <motion.nav 
-        className={`bg-[#2C1810] text-white shadow-xl border-b border-gray-800 fixed w-full top-0 z-50 transition-all duration-300 ${scrollY > 50 ? 'py-2' : 'py-4'}`}
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <motion.div 
-              className="flex-shrink-0"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.2 }}
-            >
-              <h1 className="text-2xl font-bold text-white">Bookkita</h1>
-            </motion.div>
-
-            <div className="hidden md:block">
-              <div className="ml-10 flex items-baseline space-x-8">
-                {["Home", "Category", "Event"].map((item, index) => (
-                  <motion.a
-                    key={item}
-                    href="#"
-                    className="text-gray-200 hover:text-white hover:bg-[#3D2418] px-3 py-2 rounded-md text-sm font-medium transition-all duration-200"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    {item}
-                  </motion.a>
-                ))}
-                <motion.button
-                  onClick={() => window.location.href = '/auth'}
-                  className="bg-[#D4A574] hover:bg-[#B8935F] text-white px-4 py-2 rounded-md text-sm font-medium transition-all duration-200"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  Masuk
-                </motion.button>
-              </div>
-            </div>
-
-            <div className="md:hidden">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleMenu}
-                className="text-gray-200 hover:text-white hover:bg-[#3D2418]"
-              >
-                <motion.div
-                  animate={{ rotate: isMenuOpen ? 180 : 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                </motion.div>
-              </Button>
-            </div>
-          </div>
-
-          <AnimatePresence>
-            {isMenuOpen && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-                className="md:hidden overflow-hidden"
-              >
-                <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-[#1F120C] border-t border-gray-800">
-                  {["Home", "Category", "Event"].map((item, index) => (
-                    <motion.a
-                      key={item}
-                      href="#"
-                      className="text-gray-200 hover:text-white hover:bg-[#2C1810] block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                      whileHover={{ x: 10 }}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      {item}
-                    </motion.a>
-                  ))}
-                  <motion.button
-                    onClick={() => window.location.href = '/auth'}
-                    className="w-full text-left bg-[#D4A574] hover:bg-[#B8935F] text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                    whileHover={{ x: 10 }}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    Masuk
-                  </motion.button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </motion.nav>
+      {/* Dynamic Navbar */}
+      <Navbar user={user} />
 
       {/* Hero Section */}
       <motion.section 
@@ -384,8 +310,8 @@ export default function Home() {
             >
               <motion.div 
                 className="inline-block bg-[#D4A574] text-white px-4 py-2 rounded-full text-sm font-semibold mb-6"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                //whileHover={{ scale: 1.05 }}
+                //whileTap={{ scale: 0.95 }}
               >
                 📚 Platform Ebook Terbaik
               </motion.div>
@@ -413,24 +339,26 @@ export default function Home() {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.8 }}
               >
-                <Button 
-                  size="lg" 
-                  className="bg-[#D4A574] hover:bg-[#B8935F] text-white font-bold text-lg px-8 py-4 rounded-full transition-all duration-300 transform hover:scale-105 shadow-2xl"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => window.location.href = '/auth'}
-                >
-                  Mulai Sekarang
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
+                {!user && (
+                  <Button 
+                    size="lg" 
+                    className="bg-[#D4A574] hover:bg-[#B8935F] text-white font-bold text-lg px-8 py-4 rounded-full transition-all duration-300 transform hover:scale-105 shadow-2xl"
+                    //whileHover={{ scale: 1.05 }}
+                    //whileTap={{ scale: 0.95 }}
+                    onClick={() => window.location.href = '/auth'}
+                  >
+                    Mulai Sekarang
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                )}
                 <Button 
                   variant="outline" 
                   size="lg" 
                   className="border-2 border-white text-white hover:bg-white hover:text-[#1a1a2e] font-bold text-lg px-8 py-4 rounded-full transition-all duration-300 shadow-lg"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  //whileHover={{ scale: 1.05 }}
+                  //whileTap={{ scale: 0.95 }}
                 >
-                  Lihat Koleksi
+                  {user ? 'Lihat Koleksi Saya' : 'Lihat Koleksi'}
                 </Button>
               </motion.div>
               
@@ -448,7 +376,7 @@ export default function Home() {
                   <motion.div
                     key={index}
                     className="flex items-center"
-                    whileHover={{ scale: 1.05 }}
+                    //whileHover={{ scale: 1.05 }}
                     transition={{ duration: 0.2 }}
                   >
                     <span className="text-2xl mr-2">{item.icon}</span>
@@ -466,8 +394,8 @@ export default function Home() {
             >
               <motion.div 
                 className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 shadow-2xl transform hover:scale-105 transition-transform duration-500 border border-white/20"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                //whileHover={{ scale: 1.05 }}
+                //whileTap={{ scale: 0.95 }}
               >
                 <div className="relative">
                   <div className="bg-gradient-to-br from-[#D4A574] to-[#B8935F] rounded-xl h-80 md:h-96 flex items-center justify-center relative overflow-hidden">
@@ -593,13 +521,13 @@ export default function Home() {
                   whileInView={{ y: 0, opacity: 1 }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                   viewport={{ once: true }}
-                  whileHover={{ y: -10 }}
+                  //whileHover={{ y: -10 }}
                 >
                   <Card className="group h-full hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border-gray-200 bg-white">
                     <CardHeader className="text-center pb-4">
                       <motion.div 
                         className="mx-auto w-14 h-14 rounded-full bg-gray-50 flex items-center justify-center mb-3 group-hover:bg-gray-100 transition-colors"
-                        whileHover={{ scale: 1.1, rotate: 5 }}
+                        //whileHover={{ scale: 1.1, rotate: 5 }}
                         transition={{ duration: 0.3 }}
                       >
                         <Icon className={`h-7 w-7 ${feature.color}`} />
@@ -638,11 +566,11 @@ export default function Home() {
                       whileInView={{ scale: 1, opacity: 1 }}
                       transition={{ duration: 0.5, delay: index * 0.1 }}
                       viewport={{ once: true }}
-                      whileHover={{ scale: 1.05 }}
+                      //whileHover={{ scale: 1.05 }}
                     >
                       <motion.div 
                         className="mx-auto w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mb-3"
-                        whileHover={{ rotate: 360 }}
+                        //whileHover={{ rotate: 360 }}
                         transition={{ duration: 0.6 }}
                       >
                         <Icon className="h-6 w-6 text-blue-600" />
@@ -689,7 +617,7 @@ export default function Home() {
                   whileInView={{ y: 0, opacity: 1 }}
                   transition={{ duration: 0.5, delay: index * 0.2 }}
                   viewport={{ once: true }}
-                  whileHover={{ y: -10 }}
+                  //whileHover={{ y: -10 }}
                 >
                   <Card className="group h-full hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border-gray-200 bg-white relative overflow-hidden">
                     <div className="absolute top-4 right-4 text-blue-100 opacity-30">
@@ -718,6 +646,7 @@ export default function Home() {
               ))}
             </div>
           </motion.div>
+
         </div>
       </motion.section>
 
@@ -739,8 +668,8 @@ export default function Home() {
           >
             <motion.div 
               className="inline-block bg-[#2C1810] text-white px-4 py-2 rounded-full text-sm font-semibold mb-4"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              //whileHover={{ scale: 1.05 }}
+              //whileTap={{ scale: 0.95 }}
             >
               💰 Harga Terjangkau
             </motion.div>
@@ -818,8 +747,8 @@ export default function Home() {
           >
             <motion.div 
               className="inline-block bg-[#D4A574] text-white px-6 py-3 rounded-full text-sm font-bold mb-6 shadow-lg"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              //whileHover={{ scale: 1.05 }}
+              //whileTap={{ scale: 0.95 }}
             >
               <Mail className="w-4 h-4 inline mr-2" />
               STAY UPDATED
@@ -861,8 +790,8 @@ export default function Home() {
                 <div className="flex flex-col sm:flex-row gap-4 mb-6">
                   <motion.div
                     className="flex-1"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    //whileHover={{ scale: 1.02 }}
+                    //whileTap={{ scale: 0.98 }}
                   >
                     <Input
                       type="email"
@@ -874,13 +803,13 @@ export default function Home() {
                     />
                   </motion.div>
                   <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    //whileHover={{ scale: 1.05 }}
+                    //whileTap={{ scale: 0.95 }}
                   >
                     <Button
                       type="submit"
                       disabled={isLoading || !email}
-                      className="bg-[#D4A574] hover:bg-[#B8935F] text-white font-bold px-8 py-4 rounded-full transition-all duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-[#D4A574] hover:bg-[#B8935F] text-white font-bold px-8 py-4 rounded-full transition-all duration-300 hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isLoading ? "Mendaftar..." : "Daftar Gratis"}
                     </Button>
@@ -915,7 +844,7 @@ export default function Home() {
               <motion.div
                 key={index}
                 className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-all duration-300"
-                whileHover={{ y: -10, scale: 1.02 }}
+                //whileHover={{ y: -10, scale: 1.02 }}
                 initial={{ y: 20, opacity: 0 }}
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -923,7 +852,7 @@ export default function Home() {
               >
                 <motion.div 
                   className="mx-auto w-12 h-12 bg-[#D4A574]/20 rounded-full flex items-center justify-center mb-4"
-                  whileHover={{ rotate: 360, scale: 1.1 }}
+                  //whileHover={{ rotate: 360, scale: 1.1 }}
                   transition={{ duration: 0.6 }}
                 >
                   <item.icon className="h-6 w-6 text-[#D4A574]" />
@@ -964,8 +893,8 @@ export default function Home() {
                     key={index}
                     href="#"
                     className="text-gray-400 hover:text-[#D4A574] transition-colors"
-                    whileHover={{ scale: 1.2, rotate: 5 }}
-                    whileTap={{ scale: 0.9 }}
+                    //whileHover={{ scale: 1.2, rotate: 5 }}
+                    //whileTap={{ scale: 0.9 }}
                   >
                     <span className="sr-only">Social {index}</span>
                     {icon}
@@ -1004,7 +933,7 @@ export default function Home() {
                         <a 
                           href="#" 
                           className="text-gray-400 hover:text-[#D4A574] transition-colors inline-block"
-                          whileHover={{ x: 5 }}
+                          //whileHover={{ x: 5 }}
                         >
                           {item}
                         </a>

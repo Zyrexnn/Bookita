@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, User, ArrowRight, Shield, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { Mail, User, ArrowRight, Shield, CheckCircle, Clock, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 interface AuthFormProps {
   mode: 'login' | 'register';
@@ -21,12 +21,44 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
+  const [showOtp, setShowOtp] = useState(false);
+
+  // Auto-focus email input on mount
+  useEffect(() => {
+    const emailInput = document.getElementById('email-input');
+    if (emailInput) {
+      emailInput.focus();
+    }
+  }, []);
+
+  // Auto-focus first OTP input when OTP step is shown
+  useEffect(() => {
+    if (step === 'otp') {
+      const firstOtpInput = document.getElementById('otp-0');
+      if (firstOtpInput) {
+        firstOtpInput.focus();
+      }
+    }
+  }, [step]);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
     setSuccess('');
+
+    // Basic validation
+    if (!email || !email.includes('@')) {
+      setError('Masukkan email yang valid');
+      setIsLoading(false);
+      return;
+    }
+
+    if (mode === 'register' && (!username || username.length < 3)) {
+      setError('Username minimal 3 karakter');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch('/api/auth/send-otp', {
@@ -47,7 +79,7 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
       setSuccess('Kode OTP telah dikirim ke email Anda');
       setStep('otp');
       setOtp('');
-      setResendTimer(60); // 60 seconds cooldown
+      setResendTimer(60);
       
       // Start resend timer
       const timer = setInterval(() => {
@@ -71,6 +103,12 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
     setIsLoading(true);
     setError('');
     setSuccess('');
+
+    if (!otp || otp.length !== 6) {
+      setError('Masukkan kode OTP 6 digit');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch('/api/auth/verify-otp', {
@@ -137,49 +175,110 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
     }
   };
 
-  const handleOtpChange = (value: string) => {
+  const handleOtpChange = (value: string, index: number) => {
     // Only allow numbers and limit to 6 digits
-    const numericValue = value.replace(/[^0-9]/g, '').slice(0, 6);
-    setOtp(numericValue);
+    const numericValue = value.replace(/[^0-9]/g, '').slice(0, 1);
+    
+    const newOtp = otp.split('');
+    newOtp[index] = numericValue;
+    setOtp(newOtp.join(''));
+    
+    // Auto-focus next input
+    if (numericValue && index < 5) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      if (nextInput) (nextInput as HTMLInputElement).focus();
+    }
+  };
+
+  const handleOtpKeyDown = (e: React.KeyboardEvent, index: number) => {
+    // Handle backspace
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      if (prevInput) (prevInput as HTMLInputElement).focus();
+    }
+    
+    // Handle paste
+    if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      navigator.clipboard.readText().then(text => {
+        const numbers = text.replace(/[^0-9]/g, '').slice(0, 6);
+        if (numbers.length === 6) {
+          setOtp(numbers);
+          // Focus last input
+          const lastInput = document.getElementById('otp-5');
+          if (lastInput) (lastInput as HTMLInputElement).focus();
+        }
+      });
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    const numbers = pastedData.replace(/[^0-9]/g, '').slice(0, 6);
+    if (numbers.length === 6) {
+      setOtp(numbers);
+      // Focus last input
+      const lastInput = document.getElementById('otp-5');
+      if (lastInput) (lastInput as HTMLInputElement).focus();
+    }
   };
 
   const renderOtpInputs = () => {
     return (
-      <div className="flex justify-center space-x-2 mb-6">
+      <div className="flex justify-center space-x-3 mb-6">
         {Array.from({ length: 6 }, (_, index) => (
-          <input
-            key={index}
-            type="text"
-            maxLength={1}
-            value={otp[index] || ''}
-            onChange={(e) => {
-              const newOtp = otp.split('');
-              newOtp[index] = e.target.value;
-              handleOtpChange(newOtp.join(''));
-              
-              // Auto-focus next input
-              if (e.target.value && index < 5) {
-                const nextInput = document.getElementById(`otp-${index + 1}`);
-                if (nextInput) (nextInput as HTMLInputElement).focus();
-              }
-            }}
-            onKeyDown={(e) => {
-              // Handle backspace
-              if (e.key === 'Backspace' && !otp[index] && index > 0) {
-                const prevInput = document.getElementById(`otp-${index - 1}`);
-                if (prevInput) (prevInput as HTMLInputElement).focus();
-              }
-            }}
-            id={`otp-${index}`}
-            className="w-12 h-12 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-[#D4A574] focus:outline-none transition-colors"
-          />
+          <div key={index} className="relative">
+            <input
+              id={`otp-${index}`}
+              type={showOtp ? "text" : "password"}
+              maxLength={1}
+              value={otp[index] || ''}
+              onChange={(e) => handleOtpChange(e.target.value, index)}
+              onKeyDown={(e) => handleOtpKeyDown(e, index)}
+              onPaste={handleOtpPaste}
+              className="w-12 h-12 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-[#D4A574] focus:outline-none transition-colors bg-white"
+              disabled={isLoading}
+            />
+            {index === 5 && (
+              <button
+                type="button"
+                onClick={() => setShowOtp(!showOtp)}
+                className="absolute -right-8 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
+                {showOtp ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
         ))}
       </div>
     );
   };
 
+  const resetForm = () => {
+    setStep('email');
+    setEmail('');
+    setUsername('');
+    setOtp('');
+    setError('');
+    setSuccess('');
+    setResendTimer(0);
+    setShowOtp(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] flex items-center justify-center p-4">
+      {/* Back to Home Button */}
+      <motion.button
+        onClick={() => window.location.href = '/'}
+        className="absolute top-4 left-4 text-white hover:text-[#D4A574] transition-colors flex items-center space-x-2"
+        // whileHover={{ scale: 1.05 }}
+        // whileTap={{ scale: 0.95 }}
+      >
+        <ArrowRight className="w-4 h-4 rotate-180" />
+        <span className="text-sm">Kembali</span>
+      </motion.button>
+
       <motion.div 
         className="w-full max-w-6xl mx-auto"
         initial={{ opacity: 0, y: 20 }}
@@ -187,7 +286,7 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
         transition={{ duration: 0.8 }}
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Left Side - Empty space with subtle decoration */}
+          {/* Left Side - Info */}
           <motion.div 
             className="hidden lg:block"
             initial={{ x: -50, opacity: 0 }}
@@ -211,6 +310,11 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
                   <div className="text-6xl mb-4">📚</div>
                   <h2 className="text-2xl font-bold text-white mb-2">Bookkita</h2>
                   <p className="text-white/70">Platform ebook terpercaya dengan keamanan terbaik</p>
+                  <div className="mt-6 space-y-2 text-sm text-white/60">
+                    <p>✅ Passwordless Authentication</p>
+                    <p>✅ OTP via Email</p>
+                    <p>✅ Aman & Cepat</p>
+                  </div>
                 </motion.div>
               </div>
             </div>
@@ -227,7 +331,7 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
               <CardHeader className="text-center pb-6">
                 <motion.div 
                   className="mx-auto w-16 h-16 bg-[#D4A574] rounded-full flex items-center justify-center mb-4"
-                  whileHover={{ scale: 1.05, rotate: 5 }}
+                  // whileHover={{ scale: 1.05, rotate: 5 }}
                   transition={{ duration: 0.3 }}
                 >
                   <Shield className="w-8 h-8 text-white" />
@@ -246,6 +350,25 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
               </CardHeader>
 
               <CardContent className="px-8 pb-8">
+                {/* Progress Indicator */}
+                <div className="flex items-center justify-center mb-6">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      step === 'email' ? 'bg-[#D4A574] text-white' : 'bg-green-500 text-white'
+                    }`}>
+                      {step === 'email' ? '1' : '✓'}
+                    </div>
+                    <div className={`w-16 h-1 ${
+                      step === 'otp' ? 'bg-green-500' : 'bg-gray-300'
+                    }`}></div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      step === 'otp' ? 'bg-[#D4A574] text-white' : 'bg-gray-300 text-gray-600'
+                    }`}>
+                      2
+                    </div>
+                  </div>
+                </div>
+
                 {/* Mode Toggle */}
                 <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
                   <Button
@@ -255,7 +378,10 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
                         ? 'bg-[#2C1810] text-white shadow' 
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
-                    onClick={() => onModeChange('login')}
+                    onClick={() => {
+                      onModeChange('login');
+                      resetForm();
+                    }}
                     size="sm"
                   >
                     Masuk
@@ -267,7 +393,10 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
                         ? 'bg-[#2C1810] text-white shadow' 
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
-                    onClick={() => onModeChange('register')}
+                    onClick={() => {
+                      onModeChange('register');
+                      resetForm();
+                    }}
                     size="sm"
                   >
                     Daftar
@@ -318,12 +447,14 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
                           Email Address
                         </label>
                         <Input
+                          id="email-input"
                           type="email"
                           placeholder="nama@email.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           required
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D4A574] focus:border-transparent transition-all"
+                          disabled={isLoading}
                         />
                       </div>
 
@@ -340,16 +471,28 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
                             onChange={(e) => setUsername(e.target.value)}
                             required
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D4A574] focus:border-transparent transition-all"
+                            disabled={isLoading}
                           />
                         </div>
                       )}
+
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-700">
+                          💡 Kode OTP akan dikirim ke email Anda. Pastikan email Anda valid dan dapat diakses.
+                        </p>
+                      </div>
 
                       <Button
                         type="submit"
                         disabled={isLoading || !email || (mode === 'register' && !username)}
                         className="w-full bg-[#2C1810] hover:bg-[#1F120C] text-white font-semibold py-3 rounded-lg transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isLoading ? 'Mengirim...' : (
+                        {isLoading ? (
+                          <div className="flex items-center justify-center">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                            Mengirim...
+                          </div>
+                        ) : (
                           <>
                             Kirim Kode OTP
                             <ArrowRight className="w-4 h-4 ml-2" />
@@ -371,6 +514,9 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
                         <label className="text-sm font-medium text-gray-700 text-center block">
                           Kode OTP 6 Digit
                         </label>
+                        <p className="text-sm text-gray-500 text-center">
+                          Kode telah dikirim ke <span className="font-medium">{email}</span>
+                        </p>
                         {renderOtpInputs()}
                       </div>
 
@@ -398,6 +544,7 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
                           variant="outline"
                           onClick={() => setStep('email')}
                           className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 py-3"
+                          disabled={isLoading}
                         >
                           Kembali
                         </Button>
@@ -406,7 +553,12 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
                           disabled={isLoading || otp.length !== 6}
                           className="flex-1 bg-[#2C1810] hover:bg-[#1F120C] text-white font-semibold py-3 rounded-lg transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isLoading ? 'Memverifikasi...' : (
+                          {isLoading ? (
+                            <div className="flex items-center justify-center">
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                              Memverifikasi...
+                            </div>
+                          ) : (
                             <>
                               {mode === 'login' ? 'Masuk' : 'Daftar'}
                               <ArrowRight className="w-4 h-4 ml-2" />
@@ -414,11 +566,27 @@ export default function AuthForm({ mode, onModeChange }: AuthFormProps) {
                           )}
                         </Button>
                       </div>
+
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <p className="text-sm text-yellow-700">
+                          ⚠️ Kode OTP akan kedaluwarsa dalam 5 menit. Jangan bagikan kode OTP kepada siapa pun.
+                        </p>
+                      </div>
                     </motion.form>
                   )}
                 </AnimatePresence>
               </CardContent>
             </Card>
+
+            {/* Help Section */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-white/70">
+                Butuh bantuan?{' '}
+                <a href="#" className="text-[#D4A574] hover:text-[#B8935F] transition-colors">
+                  Hubungi Support
+                </a>
+              </p>
+            </div>
           </motion.div>
         </div>
       </motion.div>
