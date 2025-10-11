@@ -1,55 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
-import { BookOpen, User, LogOut, Settings, Bell, TrendingUp, Star, Download, ArrowRight } from "lucide-react";
+import { BookOpen, User, LogOut, Settings, Bell, TrendingUp, Star, Download, ArrowRight, Loader2 } from "lucide-react";
+import { useRequireAuth } from "@/hooks/useAuthStatus";
+import { auth } from "@/lib/firebase";
 
-interface UserData {
-  id: string;
+interface FirebaseUser {
+  uid: string;
   email: string;
-  username: string;
-  name?: string;
+  displayName?: string;
+  photoURL?: string;
+  emailVerified?: boolean;
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const getUserInfo = async () => {
-      try {
-        const response = await fetch('/api/auth/me');
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData.user);
-        } else {
-          // If API fails, redirect to auth
-          window.location.href = '/auth';
-        }
-      } catch (error) {
-        console.error('Error fetching user info:', error);
-        window.location.href = '/auth';
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getUserInfo();
-  }, []);
+  const { currentUser, loading, isAuthenticated } = useRequireAuth();
+  const router = useRouter();
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      // Clear cookies
-      document.cookie = 'session-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      // Redirect to auth page
-      window.location.href = '/auth';
+      await auth.signOut();
+      router.push("/login");
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   };
 
@@ -65,14 +42,14 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) {
+  if (!isAuthenticated || !currentUser) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] flex items-center justify-center">
         <div className="text-center text-white">
           <h2 className="text-2xl font-bold mb-4">Session Expired</h2>
           <p className="mb-6">Please login again to continue</p>
           <Button 
-            onClick={() => window.location.href = '/auth'}
+            onClick={() => router.push("/login")}
             className="bg-[#D4A574] hover:bg-[#B8935F] text-white"
           >
             Login Again
@@ -82,10 +59,17 @@ export default function DashboardPage() {
     );
   }
 
+  const user = currentUser as FirebaseUser;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460]">
       {/* Dynamic Navbar */}
-      <Navbar user={user} />
+      <Navbar user={{
+        id: user.uid,
+        email: user.email,
+        username: user.displayName || user.email?.split("@")[0],
+        name: user.displayName || user.email?.split("@")[0]
+      }} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -97,7 +81,7 @@ export default function DashboardPage() {
           {/* Welcome Section */}
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-white mb-2">
-              Selamat datang kembali, {user?.name || user?.username}! 👋
+              Selamat datang kembali, {user.displayName || user.email?.split("@")[0]}! 👋
             </h2>
             <p className="text-gray-400">
               Mari lanjutkan perjalanan membaca Anda hari ini

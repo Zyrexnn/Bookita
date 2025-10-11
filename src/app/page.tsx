@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Navbar from "@/components/Navbar";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
 import { 
   Menu, X, ArrowRight, Check, Star, Quote, Mail, BookOpen, Gift, CheckCircle,
   Download, Smartphone, Users, Heart, TrendingUp, Award
@@ -20,6 +21,7 @@ interface User {
 }
 
 export default function Home() {
+  const { currentUser, loading } = useAuthStatus();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -37,22 +39,18 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // Check if user is logged in
-    const checkAuthStatus = async () => {
-      try {
-        const response = await fetch('/api/auth/me');
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
-        }
-      } catch (error) {
-        // User is not logged in
-        setUser(null);
-      }
-    };
-
-    checkAuthStatus();
-  }, []);
+    // Update user state when Firebase user changes
+    if (currentUser) {
+      setUser({
+        id: currentUser.uid,
+        email: currentUser.email || "",
+        username: currentUser.displayName || currentUser.email?.split("@")[0] || "",
+        name: currentUser.displayName || currentUser.email?.split("@")[0] || ""
+      });
+    } else {
+      setUser(null);
+    }
+  }, [currentUser]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -345,7 +343,7 @@ export default function Home() {
                     className="bg-[#D4A574] hover:bg-[#B8935F] text-white font-bold text-lg px-8 py-4 rounded-full transition-all duration-300 transform hover:scale-105 shadow-2xl"
                     //whileHover={{ scale: 1.05 }}
                     //whileTap={{ scale: 0.95 }}
-                    onClick={() => window.location.href = '/auth'}
+                    onClick={() => window.location.href = '/login'}
                   >
                     Mulai Sekarang
                     <ArrowRight className="ml-2 h-5 w-5" />

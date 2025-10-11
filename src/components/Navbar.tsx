@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, LogOut, Bell, Settings } from "lucide-react";
+import { Menu, X, User, LogOut, Bell, Settings, AlertTriangle } from "lucide-react";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
+import { auth } from "@/lib/firebase";
+import { useRouter } from "next/navigation";
 
 interface NavbarProps {
   user?: {
@@ -14,9 +17,19 @@ interface NavbarProps {
   } | null;
 }
 
-export default function Navbar({ user }: NavbarProps) {
+export default function Navbar({ user: propUser }: NavbarProps) {
+  const { currentUser, loading, firebaseReady, firebaseError } = useAuthStatus();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const router = useRouter();
+
+  // Use Firebase user if available, otherwise use prop user
+  const user = currentUser ? {
+    id: currentUser.uid,
+    email: currentUser.email || "",
+    username: currentUser.displayName || currentUser.email?.split("@")[0] || "",
+    name: currentUser.displayName || currentUser.email?.split("@")[0] || ""
+  } : propUser;
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -28,23 +41,21 @@ export default function Navbar({ user }: NavbarProps) {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      // Clear cookies
-      document.cookie = 'session-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      // Redirect to home
-      window.location.href = '/';
+      if (auth) {
+        await auth.signOut();
+      }
+      router.push("/");
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   };
 
   const handleAuthClick = () => {
-    window.location.href = '/auth';
+    router.push("/login");
   };
 
   const handleDashboardClick = () => {
-    window.location.href = '/dashboard';
+    router.push("/dashboard");
   };
 
   return (
@@ -83,7 +94,12 @@ export default function Navbar({ user }: NavbarProps) {
 
             {/* User Section */}
             <div className="flex items-center space-x-4">
-              {user ? (
+              {firebaseError ? (
+                <div className="flex items-center space-x-2 text-yellow-400">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="text-xs">Auth Error</span>
+                </div>
+              ) : user ? (
                 <>
                   {/* Notifications */}
                   <Button
@@ -159,15 +175,17 @@ export default function Navbar({ user }: NavbarProps) {
                   </div>
                 </>
               ) : (
-                /* Login Button */
-                <motion.button
-                  onClick={handleAuthClick}
-                  className="bg-[#D4A574] hover:bg-[#B8935F] text-white px-4 py-2 rounded-md text-sm font-medium transition-all duration-200"
-                  // whileHover={{ scale: 1.05 }}
-                  // whileTap={{ scale: 0.95 }}
-                >
-                  Masuk
-                </motion.button>
+                /* Login Button - Only show if not loading and Firebase is ready */
+                !loading && firebaseReady && (
+                  <motion.button
+                    onClick={handleAuthClick}
+                    className="bg-[#D4A574] hover:bg-[#B8935F] text-white px-4 py-2 rounded-md text-sm font-medium transition-all duration-200"
+                    // whileHover={{ scale: 1.05 }}
+                    // whileTap={{ scale: 0.95 }}
+                  >
+                    Masuk
+                  </motion.button>
+                )
               )}
             </div>
           </div>
@@ -217,7 +235,14 @@ export default function Navbar({ user }: NavbarProps) {
                 ))}
 
                 {/* User Section */}
-                {user ? (
+                {firebaseError ? (
+                  <div className="border-t border-gray-700 pt-4 mt-4">
+                    <div className="flex items-center px-3 py-2 text-yellow-400">
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      <span className="text-sm">Authentication Error</span>
+                    </div>
+                  </div>
+                ) : user ? (
                   <div className="border-t border-gray-700 pt-4 mt-4">
                     <div className="flex items-center px-3 py-2">
                       <div className="w-8 h-8 bg-[#D4A574] rounded-full flex items-center justify-center mr-3">
@@ -259,13 +284,16 @@ export default function Navbar({ user }: NavbarProps) {
                     </div>
                   </div>
                 ) : (
-                  <motion.button
-                    onClick={handleAuthClick}
-                    className="w-full bg-[#D4A574] hover:bg-[#B8935F] text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                    // whileHover={{ x: 10 }}
-                  >
-                    Masuk
-                  </motion.button>
+                  /* Login Button - Only show if not loading and Firebase is ready */
+                  !loading && firebaseReady && (
+                    <motion.button
+                      onClick={handleAuthClick}
+                      className="w-full bg-[#D4A574] hover:bg-[#B8935F] text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                      // whileHover={{ x: 10 }}
+                    >
+                      Masuk
+                    </motion.button>
+                  )
                 )}
               </div>
             </motion.div>
